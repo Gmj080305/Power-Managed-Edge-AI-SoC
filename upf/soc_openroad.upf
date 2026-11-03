@@ -1,0 +1,14 @@
+# soc_openroad.upf - the subset of soc.upf that OpenROAD's read_upf accepts
+# (domains, isolation strategies and level-shifter strategies). Used by
+# flow/sky130/soc_multidomain/domains.tcl. Keep it consistent with soc.upf.
+create_power_domain PD_AON
+create_power_domain PD_CMP -elements {u_cmp}
+create_power_domain PD_MEM -elements {u_mem}
+
+set_isolation ISO_CMP_OUT -domain PD_CMP -applies_to outputs \
+  -clamp_value 0 -isolation_signal cmp_iso -isolation_sense high -location parent
+set_isolation ISO_MEM_OUT -domain PD_MEM -applies_to outputs \
+  -clamp_value 0 -isolation_signal mem_iso -isolation_sense high -location parent
+
+set_level_shifter LS_CMP_OUT -domain PD_CMP -applies_to outputs \
+  -rule low_to_high -location parent

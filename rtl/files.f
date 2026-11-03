@@ -1,0 +1,27 @@
+// RTL file list (paths relative to the repository root), in compile order.
+rtl/pkg/soc_pkg.sv
+rtl/common/sync_2ff.sv
+rtl/common/rst_sync.sv
+rtl/common/pulse_sync.sv
+rtl/common/icg.sv
+rtl/common/clk_switch.sv
+rtl/common/iso_clamp0.sv
+rtl/common/iso_clamp1.sv
+rtl/common/ls_lh.sv
+rtl/common/pd_out.sv
+rtl/common/bus_slave_ack.sv
+rtl/third_party/picorv32/picorv32.v
+rtl/cmp/boot_rom.sv
+rtl/cmp/mac_pe.sv
+rtl/cmp/mac_array.sv
+rtl/cmp/mac_accel.sv
+rtl/cmp/cmp_top.sv
+rtl/mem/scratch_ram.sv
+rtl/mem/uart_tx.sv
+rtl/mem/mem_top.sv
+rtl/aon/clk_rst_ctrl.sv
+rtl/aon/wake_timer.sv
+rtl/aon/pmu_fsm.sv
+rtl/aon/aon_regs.sv
+rtl/aon/aon_top.sv
+rtl/top/soc_top.sv

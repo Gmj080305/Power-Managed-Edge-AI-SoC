@@ -1,0 +1,74 @@
+# verify.yml - RTL verification on every push (about 10 minutes).
+# Same open-source tools as `python scripts/run.py all`, from Ubuntu packages.
+name: verify
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            verilator iverilog yosys gcc-riscv64-unknown-elf
+          verilator --version; iverilog -V | head -1; yosys -V
+
+      - name: Firmware (rebuild; warn if the committed boot ROM is stale)
+        run: |
+          python3 scripts/run.py fw
+          if ! git diff --quiet rtl/cmp/boot_rom.sv; then
+            echo "::warning::rtl/cmp/boot_rom.sv differs from a fresh firmware build (different compiler version or a forgotten 'run.py fw'). Tests below use the fresh build."
+          fi
+
+      - name: Lint
+        run: python3 scripts/run.py lint
+
+      - name: Isolation structure check
+        run: python3 scripts/run.py crossings
+
+      - name: Formal proof of PMU safety rules (IC3/PDR)
+        run: python3 scripts/run.py formal --no-sby
+
+      - name: Class-based regression (Verilator, N=4 and N=8, 3 seeds)
+        run: python3 scripts/run.py regress --sim verilator --seeds 3
+
+      - name: Power-aware test with X modelling (Icarus)
+        run: |
+          python3 scripts/run.py power --sim icarus --n 4
+          python3 scripts/run.py power --sim icarus --n 8
+
+      - name: Isolation fault injection must be detected
+        run: python3 scripts/run.py power --sim icarus --fault
+
+      - name: Synthesis area (Yosys, Sky130 tt)
+        run: |
+          python3 scripts/run.py synth --fetch-lib
+          python3 scripts/run.py synth --fetch-lib --baseline
+          python3 scripts/run.py synth --fetch-lib --top mac_accel --n 8
+
+      - name: Summary
+        if: always()
+        run: |
+          {
+            echo "## Regression"; cat build/regress_summary.md 2>/dev/null | tail -1
+            echo; echo "## Synthesis (Yosys, Sky130 tt, MAC_N=4)"
+            grep -h "Chip area" build/synth_*/area.txt 2>/dev/null || true
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: verify-logs
+          path: |
+            build/**/*.log
+            build/regress_summary.md
+            build/synth_*/area.txt
+          retention-days: 14

@@ -1,0 +1,103 @@
+# soc.upf - power intent of the edge-AI SoC (IEEE 1801 / UPF 2.1 style).
+#
+# This is the reference description of what the RTL implements by hand:
+# the isolation, level-shifter and retention wrappers in rtl/common and the
+# PMU in rtl/aon. Commercial power-aware simulators (Xcelium LP, Questa PA,
+# VCS NLP) and implementation tools read it directly; OpenROAD reads the
+# subset in soc_openroad.upf.
+
+set_design_top soc_top
+
+# ------------------------------------------------------------------ domains
+create_power_domain PD_AON -include_scope
+create_power_domain PD_CMP -elements {u_cmp}
+create_power_domain PD_MEM -elements {u_mem}
+
+# ------------------------------------------------------------------ supplies
+create_supply_port VDD_AON
+create_supply_port VDD_CMP_EXT        ;# from the DVFS regulator (vsel_hi)
+create_supply_port VDD_MEM_EXT
+create_supply_port VSS
+
+create_supply_net VDD_AON   -domain PD_AON
+create_supply_net VDD_CMP_EXT -domain PD_AON
+create_supply_net VDD_MEM_EXT -domain PD_AON
+create_supply_net VSS       -domain PD_AON
+create_supply_net VDD_CMP   -domain PD_CMP
+create_supply_net VDD_MEM   -domain PD_MEM
+create_supply_net VSS       -domain PD_CMP -reuse
+create_supply_net VSS       -domain PD_MEM -reuse
+
+connect_supply_net VDD_AON     -ports VDD_AON
+connect_supply_net VDD_CMP_EXT -ports VDD_CMP_EXT
+connect_supply_net VDD_MEM_EXT -ports VDD_MEM_EXT
+connect_supply_net VSS         -ports VSS
+
+create_supply_set SS_AON -function {power VDD_AON} -function {ground VSS}
+create_supply_set SS_CMP -function {power VDD_CMP} -function {ground VSS}
+create_supply_set SS_MEM -function {power VDD_MEM} -function {ground VSS}
+associate_supply_set SS_AON -handle PD_AON.primary
+associate_supply_set SS_CMP -handle PD_CMP.primary
+associate_supply_set SS_MEM -handle PD_MEM.primary
+
+# ------------------------------------------------------------------ switches
+create_power_switch SW_CMP -domain PD_CMP \
+  -input_supply_port  {vin  VDD_CMP_EXT} \
+  -output_supply_port {vout VDD_CMP} \
+  -control_port       {en   u_aon/u_pmu/cmp_sw_en} \
+  -ack_port           {ack  sw_ack_cmp} \
+  -on_state           {ON  vin {en}} \
+  -off_state          {OFF {!en}}
+
+create_power_switch SW_MEM -domain PD_MEM \
+  -input_supply_port  {vin  VDD_MEM_EXT} \
+  -output_supply_port {vout VDD_MEM} \
+  -control_port       {en   u_aon/u_pmu/mem_sw_en} \
+  -ack_port           {ack  sw_ack_mem} \
+  -on_state           {ON  vin {en}} \
+  -off_state          {OFF {!en}}
+
+# ------------------------------------------------------------------ isolation
+# Clamp in the receiving (powered) domain: -location parent.
+set_isolation ISO_CMP_OUT -domain PD_CMP -applies_to outputs \
+  -isolation_supply_set SS_AON -clamp_value 0 \
+  -isolation_signal u_aon/u_pmu/cmp_iso -isolation_sense high -location parent
+
+set_isolation ISO_MEM_OUT -domain PD_MEM -applies_to outputs \
+  -isolation_supply_set SS_AON -clamp_value 0 \
+  -isolation_signal u_aon/u_pmu/mem_iso -isolation_sense high -location parent
+
+# The UART line idles high: clamp it to 1, not 0.
+set_isolation ISO_MEM_UART -domain PD_MEM -elements {u_mem/uart_tx} \
+  -isolation_supply_set SS_AON -clamp_value 1 \
+  -isolation_signal u_aon/u_pmu/mem_iso -isolation_sense high -location parent
+
+# ------------------------------------------------------------------ level shifters
+# Only PD_CMP changes voltage (DVFS). Low -> high on its outputs; high -> low
+# into PD_CMP is safe without a shifter in this process.
+set_level_shifter LS_CMP_OUT -domain PD_CMP -applies_to outputs \
+  -rule low_to_high -location parent
+
+# ------------------------------------------------------------------ retention
+# Intent: the accelerator configuration survives a PD_CMP power-down. The
+# RTL implements it as an always-on shadow register (ret_cfg_shadow in
+# aon_top) loaded on `save`; with retention flops, a tool would map this
+# strategy instead.
+set_retention RET_ACC_CFG -domain PD_CMP -elements {u_cmp/u_acc/cfg_q} \
+  -retention_supply_set SS_AON \
+  -save_signal    {u_aon/u_pmu/cmp_save high} \
+  -restore_signal {u_aon/u_pmu/cmp_restore high}
+
+# ------------------------------------------------------------------ power states
+add_power_state SS_AON -state ON     {-supply_expr {power == FULL_ON} -simstate NORMAL}
+add_power_state SS_CMP -state ON_H   {-supply_expr {power == {FULL_ON 1.80}} -simstate NORMAL}
+add_power_state SS_CMP -state ON_L   {-supply_expr {power == {FULL_ON 1.50}} -simstate NORMAL}
+add_power_state SS_CMP -state OFF    {-supply_expr {power == OFF} -simstate CORRUPT}
+add_power_state SS_MEM -state ON     {-supply_expr {power == FULL_ON} -simstate NORMAL}
+add_power_state SS_MEM -state OFF    {-supply_expr {power == OFF} -simstate CORRUPT}
+
+add_power_state PD_AON -state ACTIVE_H {-logic_expr {SS_CMP == ON_H && SS_MEM == ON}}
+add_power_state PD_AON -state ACTIVE_L {-logic_expr {SS_CMP == ON_L && SS_MEM == ON}}
+add_power_state PD_AON -state IDLE     {-logic_expr {SS_CMP == OFF  && SS_MEM == ON}}
+add_power_state PD_AON -state SLEEP    {-logic_expr {SS_CMP == OFF  && SS_MEM == OFF}}
+# CMP on with MEM off is deliberately absent: an illegal state.

@@ -1,0 +1,4 @@
+# Keep LF everywhere so diffs and patches apply identically on Windows.
+* text=auto eol=lf
+*.gds binary
+*.png binary

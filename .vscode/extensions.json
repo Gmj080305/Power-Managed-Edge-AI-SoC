@@ -1,0 +1,12 @@
+{
+  "recommendations": [
+    "mshr-h.veriloghdl",
+    "chipsalliance.verible",
+    "teros-technology.teroshdl",
+    "surfer-project.surfer",
+    "lramseyer.vaporview",
+    "ms-python.python",
+    "github.vscode-github-actions",
+    "github.codespaces"
+  ]
+}

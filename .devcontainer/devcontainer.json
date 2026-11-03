@@ -1,0 +1,17 @@
+{
+  // GitHub Codespaces / VS Code Dev Containers: OpenROAD-flow-scripts plus
+  // the open-source simulators, for interactive physical-design debugging.
+  // Open from VS Code with the GitHub Codespaces extension; nothing is
+  // installed on your own machine.
+  "name": "edge-ai-soc (ORFS)",
+  "image": "openroad/orfs:latest",
+  "remoteUser": "root",
+  "postCreateCommand": "apt-get update && apt-get install -y --no-install-recommends iverilog verilator gcc-riscv64-unknown-elf python3 || true",
+  "containerEnv": { "ORFS": "/OpenROAD-flow-scripts" },
+  "customizations": {
+    "vscode": {
+      "extensions": ["mshr-h.veriloghdl", "surfer-project.surfer", "ms-python.python"]
+    }
+  },
+  "hostRequirements": { "cpus": 4, "memory": "16gb" }
+}

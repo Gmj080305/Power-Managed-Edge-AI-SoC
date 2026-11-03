@@ -1,0 +1,36 @@
+# pmu.sby - SymbiYosys job for the PMU safety properties (formal/pmu_formal.sv)
+#
+#   sby -f formal/pmu.sby            all three tasks
+#   sby -f formal/pmu.sby prove      just the unbounded proof
+#
+#   prove : IC3/PDR (abc pdr) - unbounded, finds its own inductive invariants
+#   bmc   : bounded model check to depth 40 - fast counterexamples
+#   cover : every cover() is reachable, so the proofs are not vacuous
+#
+# Without SymbiYosys (CI), `python scripts/run.py formal` runs the same
+# Yosys -> AIGER -> abc pdr flow directly.
+[tasks]
+prove
+bmc
+cover
+
+[options]
+prove: mode prove
+bmc:   mode bmc
+bmc:   depth 40
+cover: mode cover
+cover: depth 80
+
+[engines]
+prove: abc pdr
+bmc:   smtbmc yices
+cover: smtbmc yices
+
+[script]
+read_verilog -formal -sv soc_pkg.sv pmu_fsm.sv pmu_formal.sv
+prep -top pmu_formal
+
+[files]
+../rtl/pkg/soc_pkg.sv
+../rtl/aon/pmu_fsm.sv
+pmu_formal.sv

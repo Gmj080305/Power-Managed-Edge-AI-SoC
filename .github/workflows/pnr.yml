@@ -1,0 +1,146 @@
+# pnr.yml - RTL-to-GDS with OpenROAD-flow-scripts (ORFS) in its Docker image.
+# Manual trigger only (Actions tab -> pnr -> Run workflow): a full SoC run
+# takes one to three hours on a standard runner.
+name: pnr
+
+on:
+  workflow_dispatch:
+    inputs:
+      multidomain:
+        description: "Also try the EXPERIMENTAL multi-domain layout"
+        type: boolean
+        default: false
+
+env:
+  ORFS_IMAGE: openroad/orfs:latest
+
+jobs:
+  activity:
+    name: switching activity (firmware run)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - run: sudo apt-get update && sudo apt-get install -y --no-install-recommends iverilog
+      - run: python3 scripts/run.py power --sim icarus --activity
+      - uses: actions/upload-artifact@v4
+        with:
+          name: activity
+          path: build/icarus_tb_power_n4_activity/activity.vcd
+          retention-days: 7
+
+  sky130:
+    name: sky130 ${{ matrix.design }}
+    needs: activity
+    runs-on: ubuntu-24.04
+    timeout-minutes: 330
+    strategy:
+      fail-fast: false
+      matrix:
+        design: [mac_accel, soc_baseline, soc_lp]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: activity
+          path: build/activity
+      - name: Pull ORFS image
+        run: docker pull "$ORFS_IMAGE"
+      - name: RTL to GDS
+        run: |
+          VCD_ARGS=""
+          if [ "${{ matrix.design }}" != "mac_accel" ]; then
+            VCD_ARGS="VCD_FILE=/work/build/activity/activity.vcd POWER_FILE_SCOPE=tb_power/dut"
+          fi
+          docker run --rm -v "$GITHUB_WORKSPACE:/work" -w /OpenROAD-flow-scripts/flow "$ORFS_IMAGE" \
+            bash -c "source /OpenROAD-flow-scripts/env.sh >/dev/null 2>&1 || true; \
+                     make DESIGN_CONFIG=/work/flow/sky130/${{ matrix.design }}/config.mk \
+                          WORK_HOME=/work/build/orfs $VCD_ARGS"
+      - name: Per-domain power
+        if: matrix.design != 'mac_accel'
+        run: |
+          D=build/orfs/results/sky130hd/${{ matrix.design }}/base
+          mkdir -p build/power/${{ matrix.design }}
+          docker run --rm -v "$GITHUB_WORKSPACE:/work" -w /work "$ORFS_IMAGE" bash -c "\
+            source /OpenROAD-flow-scripts/env.sh >/dev/null 2>&1 || true; \
+            LIBS=/OpenROAD-flow-scripts/flow/platforms/sky130hd/lib/sky130_fd_sc_hd__tt_025C_1v80.lib \
+            ODB=/work/$D/6_final.odb SDC=/work/$D/6_final.sdc SPEF=/work/$D/6_final.spef \
+            VCD=/work/build/activity/activity.vcd SCOPE=tb_power/dut \
+            OUT=/work/build/power/${{ matrix.design }} \
+            /OpenROAD-flow-scripts/tools/install/OpenROAD/bin/openroad -exit -no_init \
+              /work/flow/scripts/power_by_domain.tcl"
+          python3 flow/scripts/summarize_power.py build/power/${{ matrix.design }}/power_instances.rpt \
+            | tee -a "$GITHUB_STEP_SUMMARY"
+      - name: Report summary
+        if: always()
+        run: |
+          R=build/orfs/reports/sky130hd/${{ matrix.design }}/base
+          { echo "## ${{ matrix.design }}"; tail -n 40 $R/6_finish.rpt 2>/dev/null || echo "no finish report"; } >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: sky130-${{ matrix.design }}
+          path: |
+            build/orfs/reports/sky130hd/${{ matrix.design }}
+            build/orfs/logs/sky130hd/${{ matrix.design }}
+            build/orfs/results/sky130hd/${{ matrix.design }}/base/6_final.gds
+            build/orfs/results/sky130hd/${{ matrix.design }}/base/6_final.v
+            build/orfs/results/sky130hd/${{ matrix.design }}/base/6_final.sdc
+            build/orfs/results/sky130hd/${{ matrix.design }}/base/6_final.spef
+            build/power/${{ matrix.design }}
+          retention-days: 14
+
+  asap7_vt:
+    name: asap7 mac_accel ${{ matrix.vt }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 180
+    strategy:
+      fail-fast: false
+      matrix:
+        vt: [rvt, lvt, mixed]
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker pull "$ORFS_IMAGE"
+      - name: RTL to GDS
+        run: |
+          docker run --rm -v "$GITHUB_WORKSPACE:/work" -w /OpenROAD-flow-scripts/flow "$ORFS_IMAGE" \
+            bash -c "source /OpenROAD-flow-scripts/env.sh >/dev/null 2>&1 || true; \
+                     make DESIGN_CONFIG=/work/flow/asap7/mac_accel/config_${{ matrix.vt }}.mk \
+                          WORK_HOME=/work/build/orfs"
+      - name: Report summary
+        if: always()
+        run: |
+          R=build/orfs/reports/asap7/mac_accel/${{ matrix.vt }}
+          { echo "## asap7 ${{ matrix.vt }}"; tail -n 40 $R/6_finish.rpt 2>/dev/null || echo "no finish report"; } >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: asap7-${{ matrix.vt }}
+          path: |
+            build/orfs/reports/asap7/mac_accel/${{ matrix.vt }}
+            build/orfs/logs/asap7/mac_accel/${{ matrix.vt }}
+            build/orfs/results/asap7/mac_accel/${{ matrix.vt }}/6_final.v
+          retention-days: 14
+
+  multidomain:
+    name: sky130 soc_multidomain (experimental)
+    if: inputs.multidomain
+    runs-on: ubuntu-24.04
+    timeout-minutes: 330
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker pull "$ORFS_IMAGE"
+      - name: RTL to GDS (expected to need iteration)
+        run: |
+          docker run --rm -v "$GITHUB_WORKSPACE:/work" -w /OpenROAD-flow-scripts/flow "$ORFS_IMAGE" \
+            bash -c "source /OpenROAD-flow-scripts/env.sh >/dev/null 2>&1 || true; \
+                     make DESIGN_CONFIG=/work/flow/sky130/soc_multidomain/config.mk \
+                          WORK_HOME=/work/build/orfs"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: sky130-soc_multidomain
+          path: |
+            build/orfs/reports/sky130hd/soc_multidomain
+            build/orfs/logs/sky130hd/soc_multidomain
+          retention-days: 14

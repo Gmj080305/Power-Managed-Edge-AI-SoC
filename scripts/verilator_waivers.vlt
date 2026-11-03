@@ -1,0 +1,19 @@
+`verilator_config
+// Third-party CPU core: not ours to clean up.
+lint_off -file "*/third_party/*"
+// Unconnected optional CPU ports are intentional.
+lint_off -rule PINCONNECTEMPTY
+// picorv32.v carries a `timescale; our files rely on the command line.
+lint_off -rule TIMESCALEMOD
+// Address bits above the decoded region are deliberately ignored.
+lint_off -rule UNUSEDSIGNAL -file "*/mem_top.sv" -match "*'a'*"
+lint_off -rule UNUSEDSIGNAL -file "*/aon_top.sv" -match "*'b_addr'*"
+lint_off -rule UNUSEDSIGNAL -file "*/cmp_top.sv" -match "*'cpu_instr'*"
+lint_off -rule UNUSEDSIGNAL -file "*/cmp_top.sv" -match "*'bad_fire'*"
+// Observed by assertions through hierarchy, not by RTL.
+lint_off -rule UNUSEDSIGNAL -file "*/aon_top.sv" -match "*'cmp_restored'*"
+lint_off -rule UNUSEDSIGNAL -file "*/soc_top.sv" -match "*'mac_clk_en'*"
+lint_off -rule UNUSEDSIGNAL -file "*/soc_top.sv" -match "*'clk_sys'*"
+// pwr_good only matters under +define+PWR_SIM.
+lint_off -rule UNUSEDSIGNAL -file "*/pd_out.sv" -match "*'pwr_good'*"
+lint_off -rule UNUSEDPARAM -file "*/soc_pkg.sv"

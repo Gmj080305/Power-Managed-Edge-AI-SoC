@@ -1,0 +1,13 @@
+{
+  // Tool paths and the "EDA" terminal profile are per machine: put them in
+  // your USER settings (see docs/windows_setup.md), not here.
+  "files.eol": "\n",
+  "files.trimTrailingWhitespace": true,
+  "files.insertFinalNewline": true,
+  "files.associations": { "*.sv": "systemverilog", "*.svh": "systemverilog",
+                          "*.upf": "tcl", "*.sdc": "tcl", "*.sby": "ini" },
+  "files.exclude": { "build/": true, "**/obj_dir": true, "**/xsim.dir": true },
+  "verilog.linting.linter": "verilator",
+  "verilog.linting.verilator.arguments": "-Wall --timing -Wno-DECLFILENAME -Wno-MULTITOP -y rtl/common -y rtl/cmp -y rtl/mem -y rtl/aon -y rtl/top -y rtl/third_party/picorv32 rtl/pkg/soc_pkg.sv scripts/verilator_waivers.vlt",
+  "editor.rulers": [100]
+}

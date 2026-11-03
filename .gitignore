@@ -1,0 +1,23 @@
+# build outputs (all flows write under build/)
+build/
+fw/build/
+obj_dir/
+# Vivado simulator
+xsim.dir/
+.Xil/
+*.jou
+*.pb
+*.wdb
+webtalk*
+xvlog.log
+xelab.log
+xsim*.log
+# SymbiYosys run directories
+formal/pmu_prove/
+formal/pmu_bmc/
+formal/pmu_cover/
+# waveforms and misc
+*.vcd
+*.fst
+__pycache__/
+.DS_Store

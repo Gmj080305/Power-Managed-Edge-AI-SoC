@@ -1,0 +1,44 @@
+{
+  // Every task calls scripts/run.py, so the same steps work in the VS Code
+  // terminal on Windows and in CI. Ctrl+Shift+B runs the default build task.
+  "version": "2.0.0",
+  "options": { "cwd": "${workspaceFolder}" },
+  "presentation": { "reveal": "always", "panel": "dedicated", "clear": true },
+  "tasks": [
+    { "label": "fw: build firmware -> boot ROM", "type": "shell",
+      "command": "python scripts/run.py fw", "problemMatcher": "$gcc" },
+    { "label": "lint", "type": "shell", "command": "python scripts/run.py lint",
+      "problemMatcher": [] },
+    { "label": "crossings: isolation check", "type": "shell",
+      "command": "python scripts/run.py crossings", "problemMatcher": [] },
+    { "label": "sim: one test", "type": "shell",
+      "command": "python scripts/run.py sim --test ${input:test} --seed ${input:seed} --n ${input:n}",
+      "group": { "kind": "build", "isDefault": true }, "problemMatcher": [] },
+    { "label": "sim: one test with waves", "type": "shell",
+      "command": "python scripts/run.py sim --test ${input:test} --seed ${input:seed} --n ${input:n} --waves",
+      "problemMatcher": [] },
+    { "label": "regress: quick", "type": "shell",
+      "command": "python scripts/run.py regress --quick --seeds 1", "problemMatcher": [] },
+    { "label": "regress: full (coverage with xsim)", "type": "shell",
+      "command": "python scripts/run.py regress --seeds 3", "problemMatcher": [] },
+    { "label": "power: X-aware firmware test", "type": "shell",
+      "command": "python scripts/run.py power", "problemMatcher": [] },
+    { "label": "power: isolation fault must fail", "type": "shell",
+      "command": "python scripts/run.py power --fault", "problemMatcher": [] },
+    { "label": "formal: PMU proofs", "type": "shell",
+      "command": "python scripts/run.py formal", "problemMatcher": [] },
+    { "label": "synth: area (Sky130)", "type": "shell",
+      "command": "python scripts/run.py synth --fetch-lib", "problemMatcher": [] },
+    { "label": "all checks", "type": "shell", "command": "python scripts/run.py all",
+      "problemMatcher": [] }
+  ],
+  "inputs": [
+    { "id": "test", "type": "pickString", "description": "Test",
+      "options": ["test_matmul_rand", "test_state_walk", "test_sleep_wake_rand",
+                  "test_wake_race", "test_dvfs_switch", "test_illegal_req", "test_fw_e2e"],
+      "default": "test_matmul_rand" },
+    { "id": "seed", "type": "promptString", "description": "Seed", "default": "1" },
+    { "id": "n", "type": "pickString", "description": "MAC array size N",
+      "options": ["4", "8"], "default": "4" }
+  ]
+}

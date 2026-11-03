@@ -1,0 +1,23 @@
+# pdr.ys - SymbiYosys-free proof flow (used by scripts/run.py formal and CI).
+# Run from the repository root:  yosys -q formal/pdr.ys
+# then:  yosys-abc -c "read_aiger -c build/formal/pmu.aig; fold; strash; pdr"
+read_verilog -formal -sv rtl/pkg/soc_pkg.sv rtl/aon/pmu_fsm.sv formal/pmu_formal.sv
+prep -top pmu_formal
+flatten
+async2sync
+chformal -cover -remove
+chformal -early -assume
+dffunmap
+opt_clean
+setundef -anyseq
+opt -keepdc -fast
+delete -output
+dffunmap
+techmap
+opt -fast -nosdff -nodffe
+dffunmap
+techmap
+aigmap
+setundef -zero
+opt_clean
+write_aiger -I -B -zinit -map build/formal/pmu.aim build/formal/pmu.aig
