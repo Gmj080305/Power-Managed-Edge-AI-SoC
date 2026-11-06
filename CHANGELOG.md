@@ -1,5 +1,18 @@
 # Changelog
 
+## v0.3.0 - learning guides
+
+- `docs/theory.md`: digital design, SoC and RISC-V basics, the systolic
+  accelerator, power, low-power techniques, PMU sequencing, CDC, UPF,
+  verification (constrained random, SVA, coverage, formal, X and gate-level
+  power simulation) and physical design, each tied to the files here, with
+  self-check questions, interview questions and a glossary.
+- `docs/tools.md`: every tool used, with the exact commands for this project,
+  what the output means and what to do when it fails.
+- `docs/recreate.md`: a phase-by-phase plan to rebuild the project from an
+  empty folder in four weeks, with checkpoints and the mistakes made the
+  first time.
+
 ## v0.2.0 - gate-level power simulation, CDC fix, CI hardening
 
 - **Power-aware gate-level simulation** (`run.py gls`, `tb/gls/tb_gls.sv`):

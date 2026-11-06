@@ -1,4 +1,4 @@
-# Progress (as of 2026-11-06, v0.2.0)
+# Progress (as of 2026-11-06, v0.3.0)
 
 ## Done
 
@@ -15,6 +15,7 @@
 | 8b Gate-level power sim | Sky130 netlist + SkyWater power models, host-driven IDLE/SLEEP walk | 5,367 checks pass; fault (no isolation) detected |
 | 9-10 Flow files | ORFS configs (baseline, LP, accelerator, ASAP7 RVT/LVT/mixed, experimental multi-domain), per-domain power, corner STA in CI | written; **needs a `pnr` run** |
 
+v0.3 added the learning guides (`theory.md`, `tools.md`, `recreate.md`).
 v0.2 also fixed the wake-timer stale-expiry race (open question #7) and the
 per-domain power naming after ORFS flattening (see CHANGELOG).
 

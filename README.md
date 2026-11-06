@@ -95,6 +95,14 @@ docs/       spec, verification, physical design, setup, results, open questions
 
 ## Documentation
 
+New to the project? Start with the three guides:
+
+- [docs/theory.md](docs/theory.md) - all the theory, from flip-flops to sign-off, explained against this code
+- [docs/tools.md](docs/tools.md) - how to use every tool in this project
+- [docs/recreate.md](docs/recreate.md) - how to build the whole project yourself, phase by phase
+
+Reference:
+
 - [docs/spec.md](docs/spec.md) - architecture, power states, crossings, register maps, sequences
 - [docs/verification.md](docs/verification.md) - test plan, assertions, formal, coverage
 - [docs/physical_design.md](docs/physical_design.md) - ORFS flows, power analysis, multi-Vt, multi-domain
