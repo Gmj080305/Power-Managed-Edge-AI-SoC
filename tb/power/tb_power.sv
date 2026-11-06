@@ -64,14 +64,6 @@ module tb_power;
     $dumpfile("tb_power.vcd");
     $dumpvars(0, tb_power);
 `endif
-`ifdef ACTIVITY
-    // Switching activity for power analysis (VCD_FILE in ORFS): the DUT
-    // only, over a window of firmware running the accelerator at OPP-H.
-    // Scope for ORFS: POWER_FILE_SCOPE = tb_power/dut
-    $dumpfile("activity.vcd");
-    $dumpvars(0, dut);
-    $dumpoff;
-`endif
     // Hold power-on reset for 3 periods of the slow clock so the 32 kHz
     // domain's reset synchroniser sees it (as a real POR circuit ensures).
     #(3 * C32K_NS);
@@ -81,9 +73,16 @@ module tb_power;
   always @(posedge clk_sys) cycles++;
 
 `ifdef ACTIVITY
+  // Switching activity for power analysis (VCD_FILE in ORFS): the DUT only,
+  // over a window of firmware running the accelerator at OPP-H.
+  // Scope for ORFS: POWER_FILE_SCOPE = tb_power/dut
+  // OpenSTA's VCD reader accepts $dumpvars but not $dumpon / $dumpoff, so
+  // dumping starts with $dumpvars at the window start; run.py cuts the file
+  // at the closing $dumpoff.
   initial begin
     wait (u_uart.nchars > 0);           // console up: boot code finished
-    $dumpon;
+    $dumpfile("activity.vcd");
+    $dumpvars(0, dut);
     repeat (20000) @(posedge clk_sys);  // 400 us at 50 MHz: matmul + checks
     $dumpoff;
     $display("[%0t] TB   | activity window dumped (20000 cycles)", $time);

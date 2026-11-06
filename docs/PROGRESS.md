@@ -1,4 +1,4 @@
-# Progress (as of 2026-11-06, v0.3.0)
+# Progress (as of 2026-11-06, v0.4.0)
 
 ## Done
 
@@ -13,18 +13,21 @@
 | 7 Verification | class-based SV env (7 tests), SVA, formal (14 properties, unbounded), slang elaboration of every TB | 38/38 runs, 15,892 checks; 6/6 mutations caught |
 | 8 Synthesis | Yosys area for SoC and accelerator, baseline vs power-managed | `run.py synth` |
 | 8b Gate-level power sim | Sky130 netlist + SkyWater power models, host-driven IDLE/SLEEP walk | 5,367 checks pass; fault (no isolation) detected |
-| 9-10 Flow files | ORFS configs (baseline, LP, accelerator, ASAP7 RVT/LVT/mixed, experimental multi-domain), per-domain power, corner STA in CI | written; **needs a `pnr` run** |
+| 9-10 Place and route | ORFS configs (baseline, LP, accelerator, ASAP7 RVT/LVT/mixed, experimental multi-domain), per-domain power, corner STA in CI | accelerator: GDS in all 4 configs (first `pnr` run); SoC: VCD fix in v0.4, **needs a re-run** |
 
+v0.4 fixed the activity VCD that stopped both SoC place-and-route jobs, and
+made the `pnr` job summaries show slack, power and Vt mix.
 v0.3 added the learning guides (`theory.md`, `tools.md`, `recreate.md`).
 v0.2 also fixed the wake-timer stale-expiry race (open question #7) and the
 per-domain power naming after ORFS flattening (see CHANGELOG).
 
 ## Left (these need your machine or GitHub, not code changes)
 
-1. **Run the `pnr` workflow** (GitHub -> Actions -> pnr -> Run workflow, 1-3 h).
-   Fix any ORFS config issue it reports, then fill the "Pending" tables in
-   `docs/results.md` from the job summaries and artifacts: area, slack,
-   per-domain power, SLEEP vs baseline, corner STA, ASAP7 multi-Vt.
+1. **Re-run the `pnr` workflow** after pushing v0.4 (GitHub -> Actions -> pnr
+   -> Run workflow, 1-3 h). Send the Summary page (or the first error) so the
+   "Pending" tables in `docs/results.md` can be filled: SoC area and slack,
+   per-domain power, SLEEP vs baseline, corner STA, ASAP7 slack/leakage/LVT
+   share.
 2. **Run in xsim on Windows**: `python scripts/run.py regress --quick --seeds 1`,
    then `python scripts/run.py regress --seeds 3` for the coverage report in
    `build/coverage_n4/`. slang already compiles the xsim code paths in CI, so

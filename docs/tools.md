@@ -479,6 +479,18 @@ In `6_finish.rpt` look for: `report_tns` / `report_wns` (negative = timing
 failure), `report_design_area` (area and utilisation), `report_power`
 (internal, switching, leakage, total).
 
+### When a stage fails
+
+Find the first `[ERROR` line in the job log; the lines after it name the
+command and the stage (`2_1_floorplan` = stage 2). Example from the first
+run here: `[ERROR STA-0800] activity.vcd line 1257, unknown vcd command`
+during floorplan. OpenSTA reads switching activity as part of its stage
+reports, and its VCD reader accepts only `$dumpvars` / `$dumpall`, not the
+`$dumpon` that the test bench had written. The fix was in our test bench
+and `run.py`, not in ORFS. The `STA-`, `RSZ-`, `GPL-`, `DRT-` prefixes tell
+you which OpenROAD tool raised the message (timing, resizer, global
+placement, detailed routing).
+
 ### The extra scripts
 
 - `flow/scripts/power_by_domain.tcl`: run with OpenROAD on the final
@@ -487,6 +499,9 @@ failure), `report_design_area` (area and utilisation), `report_power`
   gives the per-domain and per-state table.
 - `flow/scripts/sta_corners.tcl`: one STA corner per run, given `LIB`,
   `ODB`, `SDC`, `PERIOD`; the `pnr` workflow loops it over the corners.
+- `flow/scripts/orfs_metrics.py --title X --logs <logs dir> [--results <results dir>]`:
+  the table on each job's Summary page (slack, TNS, area, power, Vt mix),
+  read from the metric JSON files ORFS writes next to its logs.
 
 ---
 

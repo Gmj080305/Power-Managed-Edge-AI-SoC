@@ -1,5 +1,29 @@
 # Changelog
 
+## v0.4.0 - first place-and-route run, fixes
+
+First `pnr` run (commit 13e1f24): the accelerator went RTL to GDS in Sky130
+and in all three ASAP7 Vt variants; both SoC jobs stopped at floorplan.
+
+- **Fix: activity VCD rejected by OpenSTA** (`STA-0800 unknown vcd
+  command`). The test bench dumped the activity window with
+  `$dumpoff` / `$dumpon`, which OpenSTA's VCD reader does not support (it
+  takes `$dumpvars` and `$dumpall` only). `tb_power` now starts dumping with
+  `$dumpvars` at the window start, and `run.py power --activity` cuts the
+  file at the closing `$dumpoff` and checks every remaining command against
+  the list OpenSTA accepts, so this fails in our job instead of an hour into
+  OpenROAD.
+- **Readable job summaries**: `flow/scripts/orfs_metrics.py` turns ORFS's
+  metric JSON files into a table (setup/hold slack, TNS, area, utilisation,
+  power split, DRC count, and the RVT/LVT cell mix for ASAP7). The summary
+  previously showed only the last 40 lines of `6_finish.rpt`, which held no
+  timing.
+- GitHub Actions moved to Node 24 versions (`checkout@v6`,
+  `upload-artifact@v6`, `download-artifact@v7`), clearing the deprecation
+  warnings.
+- `docs/results.md`: area, utilisation, power and IR drop of the four
+  accelerator runs.
+
 ## v0.3.0 - learning guides
 
 - `docs/theory.md`: digital design, SoC and RISC-V basics, the systolic

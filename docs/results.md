@@ -54,6 +54,32 @@ Breakdown at MAC_N = 4: scratch RAM (flops) 0.161 mm^2 (38 %), accelerator
 0.010 mm^2. Power-management overhead: isolation cells 1,900 um^2 (0.4 %);
 PMU, AON registers and wake timer about 13,400 um^2 (3.1 %).
 
+## Place and route: first `pnr` run (2026-11-06, commit 13e1f24)
+
+The accelerator completed RTL to GDS in all four configurations. The two SoC
+jobs stopped at floorplan because OpenSTA could not read the activity VCD
+(fixed in v0.4, see CHANGELOG). Source: the job logs of
+[run 42173088641](https://github.com/Gmj080305/Power-Managed-Edge-AI-SoC/actions/runs/42173088641)
+(final-report section of each "RTL to GDS" step).
+
+| Accelerator, N = 4 | Design area | Utilisation | Cells (incl. fill/tap) | Flip-flops | Total power* | Worst IR drop (VDD) |
+| --- | --- | --- | --- | --- | --- | --- |
+| Sky130 HD, 20 ns | 152,330 um^2 | 44 % | 46,472 | 1,555 | 5.93 mW | 0.10 mV (0.01 %) |
+| ASAP7 RVT, 700 ps | 2,371 um^2 | 50 % | 45,625 | 1,556 | 15.7 mW | 4.5 mV (0.59 %) |
+| ASAP7 LVT, 700 ps | 2,265 um^2 | 48 % | 44,753 | 1,556 | 16.4 mW | - |
+| ASAP7 RVT + LVT, 700 ps | 2,309 um^2 | 49 % | 45,230 | 1,556 | 15.9 mW | - |
+
+\* Default toggle rates (no VCD for the accelerator-only runs), so the power
+column compares the configurations with each other, not with silicon. Slack,
+leakage and the LVT share are not printed in the logs; from the next run the
+job summary lists them (`flow/scripts/orfs_metrics.py`).
+
+Observation from the soc_lp floorplan log: before placement, the worst setup
+path (-9.8 ns) ends on the asynchronous reset pins of the ~2,500 PD_CMP
+flops. That's the unbuffered domain-reset net; placement's `repair_design`
+buffers it, so check the post-placement slack in the next run before
+reading anything into it.
+
 ## Pending (from the `pnr` workflow)
 
 | Metric | Baseline | Power-managed |
@@ -71,5 +97,5 @@ PMU, AON registers and wake timer about 13,400 um^2 (3.1 %).
 | --- | --- | --- | --- |
 | WNS (ps) | | | |
 | Leakage (uW) | | | |
-| Area (um^2) | | | |
+| Area (um^2) | 2,371 | 2,265 | 2,309 |
 | LVT cells (%) | 0 | 100 | |

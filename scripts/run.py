@@ -319,12 +319,48 @@ def cmd_power(a) -> None:
     nerr = text.count("ERROR")
     ok, _ = verdict(text)
     if a.activity:
-        print(f"activity: {out / 'activity.vcd'}  (ORFS: VCD_FILE=..., POWER_FILE_SCOPE=tb_power/dut)")
+        vcd = out / "activity.vcd"
+        if not vcd.exists():
+            sys.exit("activity.vcd was not written")
+        print(clean_vcd_for_sta(vcd))
+        print(f"activity: {vcd}  (ORFS: VCD_FILE=..., POWER_FILE_SCOPE=tb_power/dut)")
     if a.fault:
         # With isolation removed the test MUST fail, otherwise the checks are dead.
         print(f"fault injection: {nerr} errors detected" if not ok else "fault NOT detected")
         sys.exit(0 if not ok else 1)
     sys.exit(0 if ok else 1)
+
+
+def clean_vcd_for_sta(vcd: pathlib.Path) -> str:
+    """Make a simulator VCD readable by OpenSTA (read_vcd in ORFS).
+
+    OpenSTA accepts $dumpvars and $dumpall but rejects $dumpon / $dumpoff
+    ("STA-0800 unknown vcd command"). The activity window ends with
+    $dumpoff, after which the simulator writes every signal as X: cut the
+    file there (the timestamp just before it marks the end of the window)
+    and turn any $dumpon into $dumpvars.
+    """
+    tmp = vcd.with_suffix(".tmp")
+    cut = renamed = 0
+    with open(vcd, "r", errors="replace") as src, open(tmp, "w", newline="\n") as dst:
+        for line in src:
+            word = line.strip()
+            if word == "$dumpoff":
+                cut = 1
+                break
+            if word == "$dumpon":
+                line, renamed = "$dumpvars\n", renamed + 1
+            dst.write(line)
+    os.replace(tmp, vcd)
+    # Every command OpenSTA's VcdParse.cc accepts; anything else is STA-0800.
+    ok = {"$date", "$comment", "$version", "$timescale", "$var", "$scope", "$upscope",
+          "$enddefinitions", "$dumpall", "$dumpvars", "$end"}
+    with open(vcd, "r", errors="replace") as f:
+        for no, line in enumerate(f, 1):
+            if line.startswith("$") and line.split()[0] not in ok:
+                sys.exit(f"activity.vcd line {no}: {line.split()[0]} would be rejected by OpenSTA")
+    return (f"activity.vcd cleaned for OpenSTA: {'cut at $dumpoff' if cut else 'no $dumpoff'}"
+            f"{f', {renamed} $dumpon -> $dumpvars' if renamed else ''}")
 
 
 def cmd_formal(a) -> None:

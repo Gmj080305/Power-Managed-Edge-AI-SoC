@@ -44,6 +44,9 @@ Open `6_final.gds` in KLayout on Windows.
    `VCD_FILE` / `POWER_FILE_SCOPE`, so the final report uses real switching
    activity instead of default toggle rates. RTL register names match the
    netlist; `activity_annotation.rpt` shows how much was annotated.
+   OpenSTA's VCD reader accepts `$dumpvars` and `$dumpall` but not
+   `$dumpon` / `$dumpoff`, so the window starts with `$dumpvars` and
+   `run.py` cuts the file at the closing `$dumpoff` and checks it.
 2. **Per domain.** `flow/scripts/power_by_domain.tcl` writes per-instance power
    for leaf cells; `flow/scripts/summarize_power.py` sums it by domain
    (`u_cmp*` -> PD_CMP, `u_mem*` -> PD_MEM, everything else -> PD_AON). This

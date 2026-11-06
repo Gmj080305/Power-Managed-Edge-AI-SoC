@@ -19,10 +19,10 @@ jobs:
     name: switching activity (firmware run)
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - run: sudo apt-get update && sudo apt-get install -y --no-install-recommends iverilog
       - run: python3 scripts/run.py power --sim icarus --activity
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v6
         with:
           name: activity
           path: build/icarus_tb_power_n4_activity/activity.vcd
@@ -38,8 +38,8 @@ jobs:
       matrix:
         design: [mac_accel, soc_baseline, soc_lp]
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/download-artifact@v4
+      - uses: actions/checkout@v6
+      - uses: actions/download-artifact@v7
         with:
           name: activity
           path: build/activity
@@ -106,9 +106,15 @@ jobs:
       - name: Report summary
         if: always()
         run: |
-          R=build/orfs/reports/sky130hd/${{ matrix.design }}/base
-          { echo "## ${{ matrix.design }}"; tail -n 40 $R/6_finish.rpt 2>/dev/null || echo "no finish report"; } >> "$GITHUB_STEP_SUMMARY"
-      - uses: actions/upload-artifact@v4
+          D=sky130hd/${{ matrix.design }}/base
+          {
+            python3 flow/scripts/orfs_metrics.py --title "sky130 ${{ matrix.design }}" \
+              --logs build/orfs/logs/$D --results build/orfs/results/$D
+            echo; echo "<details><summary>6_finish.rpt (last 60 lines)</summary>"; echo; echo '```'
+            tail -n 60 build/orfs/reports/$D/6_finish.rpt 2>/dev/null || echo "no finish report"
+            echo '```'; echo "</details>"
+          } >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v6
         if: always()
         with:
           name: sky130-${{ matrix.design }}
@@ -132,7 +138,7 @@ jobs:
       matrix:
         vt: [rvt, lvt, mixed]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - run: docker pull "$ORFS_IMAGE"
       - name: RTL to GDS
         run: |
@@ -143,9 +149,15 @@ jobs:
       - name: Report summary
         if: always()
         run: |
-          R=build/orfs/reports/asap7/mac_accel/${{ matrix.vt }}
-          { echo "## asap7 ${{ matrix.vt }}"; tail -n 40 $R/6_finish.rpt 2>/dev/null || echo "no finish report"; } >> "$GITHUB_STEP_SUMMARY"
-      - uses: actions/upload-artifact@v4
+          D=asap7/mac_accel/${{ matrix.vt }}
+          {
+            python3 flow/scripts/orfs_metrics.py --title "asap7 mac_accel ${{ matrix.vt }}" --time-unit ps \
+              --logs build/orfs/logs/$D --results build/orfs/results/$D
+            echo; echo "<details><summary>6_finish.rpt (last 60 lines)</summary>"; echo; echo '```'
+            tail -n 60 build/orfs/reports/$D/6_finish.rpt 2>/dev/null || echo "no finish report"
+            echo '```'; echo "</details>"
+          } >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v6
         if: always()
         with:
           name: asap7-${{ matrix.vt }}
@@ -162,7 +174,7 @@ jobs:
     timeout-minutes: 330
     continue-on-error: true
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - run: docker pull "$ORFS_IMAGE"
       - name: RTL to GDS (expected to need iteration)
         run: |
@@ -170,7 +182,7 @@ jobs:
             bash -c "source /OpenROAD-flow-scripts/env.sh >/dev/null 2>&1 || true; \
                      make DESIGN_CONFIG=/work/flow/sky130/soc_multidomain/config.mk \
                           WORK_HOME=/work/build/orfs"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v6
         if: always()
         with:
           name: sky130-soc_multidomain
