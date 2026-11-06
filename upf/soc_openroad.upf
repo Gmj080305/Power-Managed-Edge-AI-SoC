@@ -1,7 +1,9 @@
 # soc_openroad.upf - the subset of soc.upf that OpenROAD's read_upf accepts
 # (domains, isolation strategies and level-shifter strategies). Used by
 # flow/sky130/soc_multidomain/domains.tcl. Keep it consistent with soc.upf.
-create_power_domain PD_AON
+# PD_AON holds the top scope ("."): OpenROAD treats it as the top domain and
+# gives regions only to the others.
+create_power_domain PD_AON -elements {.}
 create_power_domain PD_CMP -elements {u_cmp}
 create_power_domain PD_MEM -elements {u_mem}
 

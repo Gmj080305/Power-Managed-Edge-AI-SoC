@@ -83,6 +83,16 @@ module aon_top (
                       .rst_32k_n(rst_32k_n), .arm(timer_arm), .period(wake_period),
                       .ev(ev_timer));
 
+  // ------------------------------------------------ regulator / switch handshakes
+  // vdd_ok (regulator) and sw_ack_* (power switches) come from analog or
+  // off-chip blocks with no timing relationship to clk_sys, so they are
+  // synchronised before the PMU or the registers use them (found by corner
+  // STA: unsynchronised, they were timed as synchronous inputs). Reset value 1
+  // = the power-on state: regulator settled, both domains switched on.
+  logic vdd_ok_s, sw_ack_cmp_s, sw_ack_mem_s;
+  sync_2ff #(.W(3), .RST_VAL(3'b111)) u_ack_sync (.clk(clk_sys), .rst_n(rst_sys_n),
+    .d({vdd_ok, sw_ack_cmp, sw_ack_mem}), .q({vdd_ok_s, sw_ack_cmp_s, sw_ack_mem_s}));
+
   // ------------------------------------------------ PMU
   logic       req_valid, busy, err_pulse, wake_start;
   logic [2:0] req_target, wake_mask, wake_src;
@@ -97,13 +107,13 @@ module aon_top (
     .timer_arm(timer_arm), .ev_timer(ev_timer), .ev_gpio(ev_gpio), .ev_host(ev_host),
     .wake_start(wake_start), .wake_src(wake_src), .wake_from(wake_from),
     .freq_lo(freq_lo), .freq_lo_ack(freq_lo_ack), .freq_hi_ack(freq_hi_ack),
-    .vsel_hi(vsel_hi), .vdd_ok(vdd_ok),
+    .vsel_hi(vsel_hi), .vdd_ok(vdd_ok_s),
     .cmp_pwr_req(cmp_pwr_req), .cmp_pwr_ack(pwr_ack),
     .cmp_clk_en(cmp_clk_en), .cmp_iso(cmp_iso), .cmp_rst_n(cmp_rst_req_n),
-    .cmp_sw_en(sw_en_cmp), .cmp_sw_ack(sw_ack_cmp),
+    .cmp_sw_en(sw_en_cmp), .cmp_sw_ack(sw_ack_cmp_s),
     .cmp_save(cmp_save), .cmp_restore(cmp_restore), .cmp_restored(cmp_restored),
     .mem_clk_en(mem_clk_en), .mem_iso(mem_iso), .mem_rst_n(mem_rst_req_n),
-    .mem_sw_en(sw_en_mem), .mem_sw_ack(sw_ack_mem));
+    .mem_sw_en(sw_en_mem), .mem_sw_ack(sw_ack_mem_s));
 
   // ------------------------------------------------ retention shadow
   always_ff @(posedge clk_sys or negedge rst_sys_n)
@@ -119,6 +129,6 @@ module aon_top (
     .wake_mask(wake_mask), .seq_wait(seq_wait), .pstate(pstate), .busy(busy),
     .err_pulse(err_pulse), .wake_start(wake_start), .wake_src(wake_src),
     .wake_from(wake_from), .freq_lo_ack(freq_lo_ack), .vsel_hi(vsel_hi),
-    .vdd_ok(vdd_ok), .cmp_sw_en(sw_en_cmp), .mem_sw_en(sw_en_mem),
+    .vdd_ok(vdd_ok_s), .cmp_sw_en(sw_en_cmp), .mem_sw_en(sw_en_mem),
     .ret_shadow(ret_cfg_shadow));
 endmodule

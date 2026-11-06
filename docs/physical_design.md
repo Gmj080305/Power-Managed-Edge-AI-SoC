@@ -101,11 +101,16 @@ all three fail by a wide margin.
 
 ## Multi-domain layout (experimental)
 
-`flow/sky130/soc_multidomain` adds `domains.tcl` (reads
-`upf/soc_openroad.upf`, sets domain areas: PD_CMP left 50 %, PD_MEM next 30 %)
+`flow/sky130/soc_multidomain` adds `domains.tcl` (a `PRE_FLOORPLAN_TCL`:
+reads `upf/soc_openroad.upf` and sets domain areas, PD_CMP left 50 %, PD_MEM
+next 30 %, on a fixed `CORE_AREA`; it must run before `initialize_floorplan`,
+which is where OpenROAD turns each domain into a placement region)
 and `pdn.tcl` (supplies `VDD_AON`, `VDD_CMP`, `VDD_MEM`, a grid per domain,
 level-shifter `LOWLVPWR` on `VDD_CMP`). Points that will likely need work:
 
+- First run (v0.4): `ORD-0045 Region "PD_CMP" not defined` at the PDN
+  step, because the areas were set after the floorplan. Fixed in v1.0 as
+  above; not yet re-run.
 - OpenROAD's UPF support is partial; check the log for commands it ignored.
 - Domain membership depends on hierarchical names surviving synthesis
   (`SYNTH_KEEP_MODULES` for the three domain modules, `OPENROAD_HIERARCHICAL=1`).

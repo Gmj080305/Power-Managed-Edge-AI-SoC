@@ -38,6 +38,18 @@ flowchart LR
 | IDLE | off, isolated | on (RAM kept) | - | timer, GPIO, host |
 | SLEEP | off, isolated | off, isolated | - | timer, GPIO, host |
 
+## Results at a glance
+
+| | |
+| --- | --- |
+| SLEEP leakage vs an always-on design | **93.7 % lower** (IDLE: 64.4 %), Sky130, ideal switches |
+| Power-management area overhead (after place and route) | **+0.25 %** |
+| Timing at 50 MHz, typical corner | met (+8.2 ns setup, +0.1 ns hold), 0 DRC errors |
+| Multi-Vt at 700 ps (ASAP7) | RVT fails; RVT + LVT meets with 20 % LVT cells and 55 % less leakage than all-LVT |
+| Verification | 38/38 regression runs, 14 PMU properties proved unbounded, power-aware gate-level sim, every injected bug caught |
+
+Every number, its source report and its caveats: [docs/results.md](docs/results.md).
+
 ## What is in here
 
 | Area | Contents | Status |
@@ -45,10 +57,10 @@ flowchart LR
 | RTL | `rtl/` - PMU, DVFS clocking, wake logic, isolation / level-shifter / retention wrappers, MAC accelerator, PicoRV32 integration | lint-clean (Verilator, N = 4 and 8); elaborates in Yosys, Icarus, Verilator |
 | Firmware | `fw/` - cold boot, accelerator self-test, illegal-request checks, DVFS, IDLE and SLEEP with warm boot | passes in simulation |
 | Verification | `tb/` - class-based SV environment (7 tests), bound SVA, power-aware testbench with X modelling, wake-timer CDC unit test | 38/38 regression runs pass (15,892 checks); mutations detected; every TB compiled by slang in CI |
-| Gate-level power sim | `tb/gls/` - Sky130 netlist with SkyWater power models, IDLE / SLEEP walk | 5,367 checks pass; removed isolation is caught |
+| Gate-level power sim | `tb/gls/` - Sky130 netlist with SkyWater power models, IDLE / SLEEP walk | 5,377 checks pass; removed isolation is caught |
 | Formal | `formal/` - 14 PMU safety properties | proved unbounded (IC3/PDR); 3/3 injected bugs found |
 | Power intent | `upf/soc.upf` (full IEEE 1801), `upf/soc_openroad.upf` (OpenROAD subset) | reference / experimental |
-| Physical design | `flow/` - ORFS configs: Sky130 baseline, power-managed SoC, accelerator; ASAP7 RVT / LVT / mixed; experimental multi-domain; per-domain power; corner STA | runs in the `pnr` workflow |
+| Physical design | `flow/` - ORFS configs: Sky130 baseline, power-managed SoC, accelerator; ASAP7 RVT / LVT / mixed; experimental multi-domain; per-domain power; corner STA | all 6 designs to GDS, 0 DRC errors; corner STA and Vt study in results |
 | Automation | `scripts/run.py`, `.vscode/tasks.json`, `.github/workflows/` | `verify` passes on GitHub Actions; Windows paths documented |
 
 See [docs/results.md](docs/results.md) for every measured number and where it

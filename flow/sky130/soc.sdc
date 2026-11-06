@@ -18,5 +18,6 @@ create_clock -name vclk -period $clk_period
 set_input_delay  [expr {$clk_period * $io_pct}] -clock vclk [all_inputs -no_clocks]
 set_output_delay [expr {$clk_period * $io_pct}] -clock vclk [all_outputs]
 
-# Asynchronous pins: each enters through a 2-flop synchroniser.
-set_false_path -from [get_ports {por_n gpio_wake host_wake test_en}]
+# Asynchronous pins: each enters through a 2-flop synchroniser (the
+# regulator and power-switch handshakes since v1.0, see aon_top.sv).
+set_false_path -from [get_ports {por_n gpio_wake host_wake test_en vdd_ok sw_ack_cmp sw_ack_mem}]

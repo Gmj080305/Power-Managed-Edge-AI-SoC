@@ -1,5 +1,37 @@
 # Changelog
 
+## v1.0.0 - complete: place-and-route results, STA-driven fix
+
+Second `pnr` run (commit 840b73d): every Sky130 and ASAP7 design went RTL to
+GDS with 0 DRC errors; corner STA and per-domain power ran.
+
+- **Results** (`docs/results.md`): SLEEP leakage 93.7 % below the always-on
+  baseline (IDLE 64.4 %), power-management area overhead +0.25 % after place
+  and route, typical-corner timing met; ASAP7 multi-Vt: RVT fails 700 ps by
+  80 ps, LVT meets at 5.6x leakage, RVT + LVT meets with 20.4 % LVT cells at
+  55 % less leakage than all-LVT; four-corner STA table with the two real
+  misses explained (OPP-H setup at ss -1.12 ns; synchroniser hold at ff
+  -0.03 ns, both tt-only-repair effects).
+- **Design fix found by corner STA**: `vdd_ok` (regulator) and `sw_ack_cmp` /
+  `sw_ack_mem` (power switches) reached the PMU unsynchronised; the
+  simulation models answer on `clk_sys`, which hid it. `aon_top.sv` now
+  synchronises them (two flops, reset value 1 = power-on state) and
+  `soc.sdc` declares them asynchronous. Wake latency 1.44 -> 1.60 us; every
+  test, proof and the gate-level run pass unchanged.
+- **Per-domain power summary** (`summarize_power.py`): physical-only cells
+  (tap, filler, antenna) are no longer counted, and clock-tree buffers that
+  CTS puts at the top level are assigned to the domain of the clock they
+  drive. The first real report had tripped the safety check because 128k
+  filler/tap cells diluted the PD_CMP share.
+- **Multi-domain layout** (experimental): the PDN step failed with
+  `ORD-0045 Region "PD_CMP" not defined`. OpenROAD creates domain regions in
+  `eval_upf`, called by `initialize_floorplan`, so `domains.tcl` now runs as
+  `PRE_FLOORPLAN_TCL` on a fixed `CORE_AREA`, and PD_AON is the UPF top
+  domain (`-elements {.}`). Not yet re-run.
+- Documented limitations: default-activity dynamic power (VCD annotation
+  2,113 of 126,656 pins, with an offline analysis of why), debug-port hold
+  constraints, tt-only timing repair (`open_questions.md` 9-12).
+
 ## v0.4.0 - first place-and-route run, fixes
 
 First `pnr` run (commit 13e1f24): the accelerator went RTL to GDS in Sky130

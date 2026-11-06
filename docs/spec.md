@@ -44,6 +44,7 @@ no wake source enabled. Requesting the current state is a legal no-op.
 | timer period | clk_sys -> clk_32k | quasi-static: written long before the arm toggle arrives |
 | gpio_wake, host_wake | pin -> clk_sys | 2-flop sync + edge detect |
 | clock-switch status | clk_in / clk_in/2 -> clk_sys | 2-flop sync |
+| `vdd_ok`, `sw_ack_cmp`, `sw_ack_mem` | regulator / power switches -> clk_sys | 2-flop sync, reset value 1 (power-on state); false path in the SDC (v1.0) |
 
 ## Domain crossings
 

@@ -235,7 +235,9 @@ level; a temporary top with PD_CMP + PD_MEM is fine).
    BOOT_REASON, WAKE_CNT, RET_ACC, 4 scratch words.
 5. **`aon_top.sv`**: everything from PD_CMP through `ls_lh` then
    `iso_clamp0`; the retention shadow loaded on `cmp_save`; the wake pin
-   synchronisers and edge detectors.
+   synchronisers and edge detectors; and two-flop synchronisers on
+   `vdd_ok`, `sw_ack_cmp`, `sw_ack_mem` (they come from analog blocks with
+   no clock: this project forgot them until corner STA found it).
 
 Mistakes made here, all caught by tests:
 

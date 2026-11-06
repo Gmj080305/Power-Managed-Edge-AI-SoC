@@ -754,7 +754,13 @@ correct once (Part 9.7) and then cannot be misused.
 Gated copies of one clock are still one clock domain: the bus between
 domains is synchronous, so no CDC logic is needed on it. That was a
 deliberate design choice (`docs/spec.md`). The real asynchronous crossings
-are the wake timer, the wake pins, and the clock-switch status.
+are the wake timer, the wake pins, the clock-switch status, and the
+handshakes from the regulator (`vdd_ok`) and power switches (`sw_ack_*`).
+Those last ones were first wired straight into the PMU, because the
+simulation models happen to answer on `clk_sys`; corner STA flagged them
+(they were being timed as synchronous inputs), and v1.0 added the missing
+synchronisers. Real analog blocks have no clock relationship to your logic:
+always synchronise their outputs.
 
 ### 7.2 The two-flop synchroniser
 
@@ -1096,7 +1102,7 @@ gated clocks (in a zero-delay netlist, a flop's new output and a gated clock
 edge can land in the same instant, and the order is arbitrary).
 
 What the test proves: with PD_CMP's rail off, its cells really are X inside
-(975 of 975 off cycles), yet no SoC output and no PMU output is ever X, the
+(979 of 979 off cycles), yet no SoC output and no PMU output is ever X, the
 host port reads the clamp value, the UART pin stays high while PD_MEM is
 off, and after wake the config, scratch, wake count and boot reason are
 right. With isolation removed (`--fault`) the X reaches the pins at once.

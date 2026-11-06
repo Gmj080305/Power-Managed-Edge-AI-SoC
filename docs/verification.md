@@ -128,7 +128,7 @@ From the sandbox used to build the repo (Ubuntu 24.04: Verilator 5.020, Icarus
 | Bounded model check (Yosys SAT) | all properties hold to depth 30 |
 | Wake-timer unit test | passes; fails on the v0.1 timer (stale expiry delivered) |
 | slang elaboration | 4 configurations (class TB N = 4; N = 8 + `PWR_SIM`; power TB + activity; unit test), 0 errors |
-| Gate-level power simulation | 5,367 checks pass; PD_CMP X inside on 975/975 off cycles, PD_MEM on 590/590; no X outside |
+| Gate-level power simulation | 5,377 checks pass; PD_CMP X inside on 979/979 off cycles, PD_MEM on 586/586; no X outside |
 | Gate-level fault injection (no isolation) | detected: X on host port and PMU outputs from the first off cycle |
 
 The `verify` workflow (same commands) passed on GitHub Actions for v0.1.

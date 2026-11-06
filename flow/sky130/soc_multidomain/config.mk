@@ -17,9 +17,12 @@ export VERILOG_TOP_PARAMS = MAC_N 4
 export SYNTH_KEEP_MODULES = *cmp_top* *mem_top* *aon_top*
 export OPENROAD_HIERARCHICAL = 1
 
-export CORE_UTILIZATION   = 30
+# Fixed die/core (about 30 % utilisation) instead of CORE_UTILIZATION:
+# domains.tcl needs the core coordinates before the floorplan exists.
+export DIE_AREA           = 0 0 1240 1240
+export CORE_AREA          = 10 10 1230 1230
 export PLACE_DENSITY      = 0.5
 export TNS_END_PERCENT    = 100
 
-export POST_FLOORPLAN_TCL = $(REPO_DIR)/flow/sky130/soc_multidomain/domains.tcl
+export PRE_FLOORPLAN_TCL  = $(REPO_DIR)/flow/sky130/soc_multidomain/domains.tcl
 export PDN_TCL            = $(REPO_DIR)/flow/sky130/soc_multidomain/pdn.tcl
