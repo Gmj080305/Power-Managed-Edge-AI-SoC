@@ -50,8 +50,15 @@ def load(path: pathlib.Path) -> dict:
         for i in range(4):
             s[i] += vals[i]
         s[4] += 1
-    if sum(s[4] for s in sums.values()) == 0:
+    total = sum(v[4] for v in sums.values())
+    if total == 0:
         sys.exit(f"no instance rows parsed from {path}")
+    # Sanity check: PD_CMP (CPU + accelerator) must hold a large share of the
+    # cells. If it does not, instance names lost their hierarchy prefix and
+    # the split is meaningless.
+    if sums["PD_CMP"][4] < 0.2 * total:
+        sys.exit(f"{path}: only {sums['PD_CMP'][4]} of {total} cells look like PD_CMP - "
+                 "instance names lost their u_cmp/u_mem prefix (check SYNTH_KEEP_MODULES)")
     return sums
 
 

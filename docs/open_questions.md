@@ -5,23 +5,25 @@
 1. **Power switches and regulator are modelled.** Sky130 HD has no power-switch
    cell; switch acknowledge and regulator `vdd_ok` come from testbench models
    (`tb/models/`). Sleep leakage numbers exclude switch off-state leakage.
-2. **Power-aware simulation is modelled in RTL**, not driven by UPF: `pd_out`
+2. **Power-aware RTL simulation is modelled**, not driven by UPF: `pd_out`
    drives X from unpowered domains, and memories / the CPU register file are
-   explicitly corrupted at power-off. A commercial power-aware simulator would
-   corrupt every register from `upf/soc.upf`. Comparing the two (BITS lab
-   Xcelium) is a good exercise.
+   explicitly corrupted at power-off. The gate-level run (`run.py gls`) closes
+   most of that gap, since every cell there corrupts from its own supply pin,
+   but it is zero-delay (unit-delay flops) with ideal rails. A commercial
+   power-aware simulator reading `upf/soc.upf` (BITS lab Xcelium) is the next
+   comparison.
 3. **Retention is a shadow register in PD_AON**, not retention flops, so save
    must come before isolation (see spec). The UPF `set_retention` describes the
    intent a retention-flop flow would implement.
-4. **OPP-L timing needs corner libraries** ORFS does not ship (open_pdks).
-   Mixed-voltage paths are approximated by single-corner STA.
+4. **OPP-L timing uses corner libraries** ORFS does not ship; the `pnr`
+   workflow installs them with ciel. Mixed-voltage paths are still
+   approximated by single-corner STA (one library set per run).
 5. **Flop-based memories** dominate area and leakage.
 6. **Verilator 5.0x** (the Ubuntu package used in CI) ignores constraints and
    covergroups: constraint-solving and coverage are exercised in xsim.
-7. **The wake timer can be re-armed while a stale expiry is still in the
-   synchronisers** (a few clk_sys cycles after a wake from another source). In
-   that window an old expiry could cause an immediate wake from the next
-   power-down. Harmless (a spurious wake), but worth a disarm handshake.
+7. ~~The wake timer can be re-armed while a stale expiry is still in the
+   synchronisers.~~ Fixed in v0.2: expiries carry the arm generation and stale
+   ones are dropped (`rtl/aon/wake_timer.sv`, `tb/unit/tb_wake_timer.sv`).
 8. **The multi-domain layout is experimental** (see physical_design.md).
 
 ## Questions worth asking a mentor

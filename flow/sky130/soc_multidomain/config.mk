@@ -14,7 +14,7 @@ export VERILOG_FILES      = $(addprefix $(REPO_DIR)/,$(RTL_FILES))
 export SDC_FILE           = $(REPO_DIR)/flow/sky130/soc.sdc
 export VERILOG_DEFINES    = -DSKY130_CELLS -DSKY130_ISO -DSKY130_LS
 export VERILOG_TOP_PARAMS = MAC_N 4
-export SYNTH_HIERARCHICAL = 1
+export SYNTH_KEEP_MODULES = *cmp_top* *mem_top* *aon_top*
 export OPENROAD_HIERARCHICAL = 1
 
 export CORE_UTILIZATION   = 30

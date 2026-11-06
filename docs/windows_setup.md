@@ -54,6 +54,9 @@ Check it: in a new terminal, `xvlog --version`, `verilator --version`,
 | power-aware test | `python scripts/run.py power` |
 | prove the PMU | `python scripts/run.py formal` |
 | area estimate | `python scripts/run.py synth --fetch-lib` |
+| wake-timer unit test | `python scripts/run.py unit` |
+| strict compile of every testbench | `python scripts/run.py elab` (needs `pip install pyslang`) |
+| gate-level power simulation | `python scripts/run.py gls` (Yosys + Icarus; fetches the Sky130 models once with git) |
 | everything | `python scripts/run.py all` |
 
 `run.py` picks xsim when Vivado is on PATH; add `--sim verilator` for speed.

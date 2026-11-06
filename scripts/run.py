@@ -5,12 +5,16 @@ tasks) and Linux (CI). Run from anywhere; paths are resolved from the repo.
     python scripts/run.py fw                          build firmware -> boot ROM
     python scripts/run.py lint                        Verilator (+ Verible) lint
     python scripts/run.py crossings                   isolation structure check
+    python scripts/run.py unit                        directed unit tests (wake timer)
+    python scripts/run.py elab                        slang compile of every TB (xsim code paths)
     python scripts/run.py sim  --test test_wake_race  one class-based test
     python scripts/run.py regress [--quick]           all tests x seeds x N
     python scripts/run.py power [--fault]             power-aware X test (4-state)
     python scripts/run.py formal                      PMU proofs
     python scripts/run.py synth [--lib X.lib]         Yosys area estimate
-    python scripts/run.py all                         lint+crossings+formal+regress+power
+    python scripts/run.py gls [--fault]               power-aware gate-level sim (Sky130 netlist)
+    python scripts/run.py all                         lint+crossings+unit+formal+regress+power
+                                                      (+ gls when Yosys and Icarus are present)
 
 Simulator choice (--sim): xsim if Vivado is on PATH, else verilator, else
 icarus. Class-based tests need xsim or verilator; the power test needs a
@@ -55,6 +59,8 @@ TB_POWER = ["tb/models/regulator_model.sv", "tb/models/pwr_switch_model.sv",
 SKY130_LIB_URL = ("https://raw.githubusercontent.com/The-OpenROAD-Project/"
                   "OpenROAD-flow-scripts/master/flow/platforms/sky130hd/lib/"
                   "sky130_fd_sc_hd__tt_025C_1v80.lib")
+SKY130_MODELS_URL = "https://github.com/google/skywater-pdk-libs-sky130_fd_sc_hd.git"
+SKY130_MODELS_REV = "ac7fb61f06e6470b94e8afdf7c25268f62fbd7b1"
 
 
 # ---------------------------------------------------------------- helpers
@@ -218,6 +224,42 @@ def cmd_crossings(a) -> None:
         sys.exit("crossing check failed")
 
 
+UNIT_TESTS = {  # top : files
+    "tb_wake_timer": ["rtl/common/sync_2ff.sv", "rtl/common/pulse_sync.sv",
+                      "rtl/aon/wake_timer.sv", "tb/unit/tb_wake_timer.sv"],
+}
+
+
+def cmd_unit(a) -> None:
+    sim = pick_sim(a.sim, need_classes=False, need_4state=True)
+    if sim == "verilator":
+        sim = "icarus" if tool("iverilog") else sim
+    fails = 0
+    for top, files in UNIT_TESTS.items():
+        out = BUILD / f"unit_{sim}_{top}"
+        out.mkdir(parents=True, exist_ok=True)
+        srcs = [str(ROOT / f) for f in files]
+        if sim == "icarus":
+            run(["iverilog", "-g2012", "-s", top, "-o", out / "sim.vvp"] + srcs)
+            text = run(["vvp", "-n", out / "sim.vvp"], cwd=out, check=False).stdout
+        else:
+            run(["xvlog", "--sv"] + srcs, cwd=out)
+            run(["xelab", top, "-s", f"{top}_snap"], cwd=out)
+            text = run(["xsim", f"{top}_snap", "-R"], cwd=out, check=False).stdout
+        ok = f"TEST PASSED {top}" in text and "ERROR" not in text
+        fails += not ok
+        print(("PASS " if ok else "FAIL ") + top)
+        if not ok:
+            print(text[-2000:])
+    sys.exit(1 if fails else 0)
+
+
+def cmd_elab(a) -> None:
+    r = run([sys.executable, ROOT / "scripts/slang_check.py"], check=False)
+    print(r.stdout)
+    sys.exit(r.returncode)
+
+
 def cmd_sim(a) -> None:
     sim = pick_sim(a.sim, need_classes=True, need_4state=a.pwr)
     out = build(sim, "tb_soc", TB_CLASS, a.n, a.pwr, a.waves, [])
@@ -299,16 +341,87 @@ def cmd_formal(a) -> None:
     sys.exit(0 if "Property proved" in r.stdout else 1)
 
 
+def fetch_sky130_lib() -> pathlib.Path:
+    lib = BUILD / "lib/sky130_fd_sc_hd__tt_025C_1v80.lib"
+    if not lib.exists():
+        lib.parent.mkdir(parents=True, exist_ok=True)
+        print("downloading", SKY130_LIB_URL)
+        urllib.request.urlretrieve(SKY130_LIB_URL, lib)
+    return lib
+
+
+def fetch_sky130_models() -> pathlib.Path:
+    """Sparse, pinned clone of the SkyWater HD library: Verilog models only."""
+    d = BUILD / "sky130_fd_sc_hd"
+    if not (d / "models").is_dir():
+        if d.exists():
+            shutil.rmtree(d)
+        run(["git", "clone", "--filter=blob:none", "--no-checkout", "--quiet", SKY130_MODELS_URL, d])
+        run(["git", "-C", d, "sparse-checkout", "set", "--no-cone", "/models/", "/cells/*/*.v",
+             "!/cells/*/*.tb.v", "!/cells/*/*symbol*.v", "!/cells/*/*blackbox*.v"])
+        run(["git", "-C", d, "checkout", "--quiet", SKY130_MODELS_REV])
+    return d
+
+
+def cmd_gls(a) -> None:
+    """Power-aware gate-level simulation of the Sky130 netlist (see tb/gls)."""
+    tag = "gls_fault" if a.fault else "gls"
+    out = BUILD / tag
+    out.mkdir(parents=True, exist_ok=True)
+    lib = (a.lib or fetch_sky130_lib()).resolve()
+    models = fetch_sky130_models()
+    p = lambda x: str(x).replace("\\", "/")
+    srcs = " ".join(p(ROOT / f) for f in rtl_files())
+    defs = "-DSKY130_CELLS -DSKY130_ISO -DSKY130_LS" + (" -DFAULT_NO_ISO" if a.fault else "")
+    net = out / "soc_netlist.v"
+    ys = [f"read_liberty -lib {p(lib)}",
+          f"read_verilog -sv {defs} {srcs}",
+          "hierarchy -check -top soc_top -chparam MAC_N 4",
+          "proc",
+          # one netlist module per power domain; everything below is flattened
+          "setattr -mod -set keep_hierarchy 1 *cmp_top* *mem_top* *aon_top*",
+          "synth -top soc_top -flatten",
+          f"dfflibmap -liberty {p(lib)}",
+          f"abc -liberty {p(lib)}",
+          "opt_clean",
+          "setundef -zero",
+          "hilomap -hicell sky130_fd_sc_hd__conb_1 HI -locell sky130_fd_sc_hd__conb_1 LO",
+          f"tee -o {p(out / 'stat.txt')} stat -liberty {p(lib)}",
+          f"write_verilog -noattr -noexpr {p(net)}"]
+    (out / "synth.ys").write_text("\n".join(ys) + "\n")
+    run(["yosys", "-q", "-l", out / "yosys.log", out / "synth.ys"])
+    run([sys.executable, ROOT / "scripts/gls_power_pins.py", net, out / "soc_netlist_pg.v"])
+
+    cells = sorted(set(re.findall(r"\b(sky130_fd_sc_hd__\w+?_\d+)\s", net.read_text())))
+    files = []
+    for c in cells:
+        base = c[len("sky130_fd_sc_hd__"):].rsplit("_", 1)[0]
+        f = models / "cells" / base / f"{c}.v"
+        if not f.exists():
+            sys.exit(f"no model for {c}: {f}")
+        files.append(p(f))
+    files += [p(out / "soc_netlist_pg.v")] + [p(ROOT / f) for f in
+              ("tb/models/regulator_model.sv", "tb/models/pwr_switch_model.sv", "tb/gls/tb_gls.sv")]
+    (out / "files.f").write_text("\n".join(files) + "\n")
+    print(f"netlist: {len(cells)} cell types; models from {models}")
+    run(["iverilog", "-g2012", "-grelative-include", "-DUSE_POWER_PINS", "-DFUNCTIONAL",
+         "-DUNIT_DELAY=#1", "-s", "tb_gls", "-o", out / "gls.vvp", "-c", out / "files.f"])
+    text = run(["vvp", "-n", out / "gls.vvp"] + (["+vcd"] if a.waves else []),
+               cwd=out, log=out / "sim.log", check=False).stdout
+    print("\n".join(l for l in text.splitlines() if not l.startswith("VCD"))[-3000:])
+    passed = "TEST PASSED tb_gls" in text
+    if a.fault:
+        print("fault detected: PASS" if not passed else "fault NOT detected: FAIL")
+        sys.exit(0 if not passed else 1)
+    sys.exit(0 if passed else 1)
+
+
 def cmd_synth(a) -> None:
     out = BUILD / f"synth_{a.top}_n{a.n}"
     out.mkdir(parents=True, exist_ok=True)
     lib = a.lib
     if a.fetch_lib:
-        lib = BUILD / "lib/sky130_fd_sc_hd__tt_025C_1v80.lib"
-        if not lib.exists():
-            lib.parent.mkdir(parents=True, exist_ok=True)
-            print("downloading", SKY130_LIB_URL)
-            urllib.request.urlretrieve(SKY130_LIB_URL, lib)
+        lib = fetch_sky130_lib()
     srcs = " ".join(str(ROOT / f).replace("\\", "/") for f in rtl_files())
     param = "MAC_N" if a.top == "soc_top" else "N"
     defs = "-DSKY130_CELLS -DSKY130_ISO" if lib else ""
@@ -333,8 +446,10 @@ def cmd_synth(a) -> None:
 
 
 def cmd_all(a) -> None:
-    steps = [["lint"], ["crossings"], ["formal"], ["regress", "--quick", "--seeds", "1"],
+    steps = [["lint"], ["crossings"], ["unit"], ["formal"], ["regress", "--quick", "--seeds", "1"],
              ["power"], ["power", "--fault"]]
+    if tool("yosys") and tool("iverilog") and not a.no_gls:
+        steps += [["gls"], ["gls", "--fault"]]
     failed = []
     for s in steps:
         r = subprocess.run([sys.executable, __file__] + s, cwd=ROOT)
@@ -352,6 +467,12 @@ def main() -> None:
     sub.add_parser("fw").set_defaults(func=cmd_fw)
     sub.add_parser("lint").set_defaults(func=cmd_lint)
     sub.add_parser("crossings").set_defaults(func=cmd_crossings)
+
+    sub.add_parser("elab").set_defaults(func=cmd_elab)
+
+    u = sub.add_parser("unit")
+    u.add_argument("--sim", choices=["xsim", "icarus"])
+    u.set_defaults(func=cmd_unit)
 
     s = sub.add_parser("sim")
     s.add_argument("--test", default="test_matmul_rand", choices=list(TESTS))
@@ -392,7 +513,15 @@ def main() -> None:
     y.add_argument("--baseline", action="store_true", help="no isolation logic")
     y.set_defaults(func=cmd_synth)
 
-    sub.add_parser("all").set_defaults(func=cmd_all)
+    g = sub.add_parser("gls")
+    g.add_argument("--lib", type=pathlib.Path, help="Sky130 tt Liberty (default: download)")
+    g.add_argument("--fault", action="store_true", help="netlist without isolation; test must fail")
+    g.add_argument("--waves", action="store_true", help="dump tb_gls.vcd (top-level signals)")
+    g.set_defaults(func=cmd_gls)
+
+    al = sub.add_parser("all")
+    al.add_argument("--no-gls", action="store_true", help="skip the gate-level steps")
+    al.set_defaults(func=cmd_all)
 
     a = p.parse_args()
     a.func(a)

@@ -5,6 +5,13 @@
 // synchronisers (toggle synchronisers). `period` is quasi-static: software
 // writes it before requesting a power-down, many 32 kHz cycles before the
 // arm toggle can arrive, so it is stable when sampled.
+//
+// Stale expiries: the 32 kHz side echoes back the arm toggle it has seen
+// (arm_d). An expiry is only reported while that echo equals the current
+// arm_tgl, i.e. it belongs to the latest arming. An expiry from an earlier
+// arming that is still in the synchronisers when the timer is re-armed is
+// dropped. Ordering: arm_d flips before (never after) the match of the new
+// arming, and both cross through identical 2-flop synchronisers.
 module wake_timer (
   input  logic        clk_sys,
   input  logic        rst_sys_n,
@@ -19,11 +26,14 @@ module wake_timer (
   always_ff @(posedge clk_sys or negedge rst_sys_n)
     if (!rst_sys_n) arm_tgl <= 1'b0; else if (arm) arm_tgl <= ~arm_tgl;
 
-  logic match_tgl;
-  pulse_sync u_ev_sync (.clk(clk_sys), .rst_n(rst_sys_n), .tgl(match_tgl), .pulse(ev));
+  logic match_tgl, ev_raw, arm_echo_s;
+  logic arm_s, arm_d;
+  pulse_sync u_ev_sync (.clk(clk_sys), .rst_n(rst_sys_n), .tgl(match_tgl), .pulse(ev_raw));
+  sync_2ff   u_echo    (.clk(clk_sys), .rst_n(rst_sys_n), .d(arm_d), .q(arm_echo_s));
+  assign ev = ev_raw & (arm_echo_s == arm_tgl);
 
   // ---------------- clk_32k side
-  logic        arm_s, arm_d, running;
+  logic        running;
   logic [23:0] cnt;
   sync_2ff u_arm_sync (.clk(clk_32k), .rst_n(rst_32k_n), .d(arm_tgl), .q(arm_s));
 

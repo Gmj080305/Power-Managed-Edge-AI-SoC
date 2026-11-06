@@ -34,6 +34,14 @@ jobs:
       - name: Isolation structure check
         run: python3 scripts/run.py crossings
 
+      - name: Strict SystemVerilog elaboration of every testbench (slang)
+        run: |
+          python3 -m pip install --quiet pyslang
+          python3 scripts/run.py elab
+
+      - name: Unit tests (wake timer CDC)
+        run: python3 scripts/run.py unit --sim icarus
+
       - name: Formal proof of PMU safety rules (IC3/PDR)
         run: python3 scripts/run.py formal --no-sby
 
@@ -48,6 +56,11 @@ jobs:
       - name: Isolation fault injection must be detected
         run: python3 scripts/run.py power --sim icarus --fault
 
+      - name: Power-aware gate-level simulation (Sky130 netlist + SkyWater power models)
+        run: |
+          python3 scripts/run.py gls
+          python3 scripts/run.py gls --fault
+
       - name: Synthesis area (Yosys, Sky130 tt)
         run: |
           python3 scripts/run.py synth --fetch-lib
@@ -59,6 +72,8 @@ jobs:
         run: |
           {
             echo "## Regression"; cat build/regress_summary.md 2>/dev/null | tail -1
+            echo; echo "## Gate-level power simulation"
+            grep -h "PD_CMP off\|tb_gls:" build/gls/sim.log 2>/dev/null || true
             echo; echo "## Synthesis (Yosys, Sky130 tt, MAC_N=4)"
             grep -h "Chip area" build/synth_*/area.txt 2>/dev/null || true
           } >> "$GITHUB_STEP_SUMMARY"
@@ -71,4 +86,5 @@ jobs:
             build/**/*.log
             build/regress_summary.md
             build/synth_*/area.txt
+            build/gls/stat.txt
           retention-days: 14

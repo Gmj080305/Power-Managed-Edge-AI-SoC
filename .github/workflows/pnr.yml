@@ -70,6 +70,39 @@ jobs:
               /work/flow/scripts/power_by_domain.tcl"
           python3 flow/scripts/summarize_power.py build/power/${{ matrix.design }}/power_instances.rpt \
             | tee -a "$GITHUB_STEP_SUMMARY"
+      - name: Multi-corner STA (ss / ff libraries from a ciel sky130 PDK)
+        if: matrix.design == 'soc_lp'
+        continue-on-error: true
+        run: |
+          python3 -m pip install --quiet ciel
+          export PDK_ROOT=$GITHUB_WORKSPACE/build/pdk
+          V=$(ciel ls-remote --pdk-family sky130 | head -n 1)
+          echo "sky130 PDK version $V"
+          ciel enable --pdk-root "$PDK_ROOT" --pdk-family sky130 "$V"
+          L=/work/build/pdk/sky130A/libs.ref/sky130_fd_sc_hd/lib
+          D=/work/build/orfs/results/sky130hd/${{ matrix.design }}/base
+          mkdir -p build/sta
+          docker run --rm -v "$GITHUB_WORKSPACE:/work" -w /work "$ORFS_IMAGE" bash -c "\
+            source /OpenROAD-flow-scripts/env.sh >/dev/null 2>&1 || true; \
+            OR=/OpenROAD-flow-scripts/tools/install/OpenROAD/bin/openroad; \
+            for c in 'opp_h_setup ss_100C_1v60 20' 'opp_l_setup ss_100C_1v40 40' 'hold ff_n40C_1v95 20' 'typ tt_025C_1v80 20'; do \
+              set -- \$c; \
+              LIB=$L/sky130_fd_sc_hd__\$2.lib ODB=$D/6_final.odb SDC=/work/flow/sky130/soc.sdc \
+              SPEF=$D/6_final.spef PERIOD=\$3 TAG=\$1 OUT=/work/build/sta \
+              \$OR -exit -no_init /work/flow/scripts/sta_corners.tcl; \
+            done"
+          {
+            echo "## Multi-corner STA (soc_lp, PDK $V)"
+            echo '| Check | Library | Period (ns) | Worst setup slack | Worst hold slack |'
+            echo '| --- | --- | --- | --- | --- |'
+            for c in "opp_h_setup ss_100C_1v60 20" "opp_l_setup ss_100C_1v40 40" "hold ff_n40C_1v95 20" "typ tt_025C_1v80 20"; do
+              set -- $c
+              f=build/sta/sta_$1.rpt
+              mx=$(grep -i "^worst slack" $f 2>/dev/null | sed -n 1p | awk '{print $NF}')
+              mn=$(grep -i "^worst slack" $f 2>/dev/null | sed -n 2p | awk '{print $NF}')
+              echo "| $1 | $2 | $3 | ${mx:-n/a} | ${mn:-n/a} |"
+            done
+          } | tee -a "$GITHUB_STEP_SUMMARY"
       - name: Report summary
         if: always()
         run: |
@@ -87,6 +120,7 @@ jobs:
             build/orfs/results/sky130hd/${{ matrix.design }}/base/6_final.sdc
             build/orfs/results/sky130hd/${{ matrix.design }}/base/6_final.spef
             build/power/${{ matrix.design }}
+            build/sta
           retention-days: 14
 
   asap7_vt:

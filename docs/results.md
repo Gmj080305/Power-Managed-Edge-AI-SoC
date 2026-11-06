@@ -8,7 +8,25 @@ Every number here says where it came from. Fill the "pending" rows from the
 See [verification.md](verification.md#results-so-far): 38/38 regression runs,
 15,892 checks; power-aware firmware test passes at N = 4 and 8; isolation
 fault detected; 14 PMU properties proved unbounded; 3/3 formal and 3/3
-testbench mutations caught.
+testbench mutations caught; gate-level power simulation on the Sky130 netlist
+passes (5,367 checks) and catches removed isolation. `verify` passed on GitHub
+Actions.
+
+## Gate-level netlist (Yosys 0.33 + ABC, Sky130 HD tt, MAC_N = 4)
+
+From `build/gls/stat.txt` (`run.py gls`): the netlist with all low-power cells
+mapped, before place and route.
+
+| Domain module | Cells | Area (um^2) |
+| --- | --- | --- |
+| PD_CMP (`cmp_top`) | 29,666 | 242,406 |
+| PD_MEM (`mem_top`) | 12,317 | 167,129 |
+| PD_AON (`aon_top` + top-level isolation and level shifters) | 1,440 | 19,771 |
+| Total | 43,420 | 429,307 |
+
+Low-power cells: 713 isolation cells (585 `lpflow_isobufsrc`, 128
+`lpflow_inputiso1p`), 182 level shifters (`lpflow_lsbuf_lh_isowell_4`),
+3 clock gates (`dlclkp`).
 
 ## Performance (simulation)
 
@@ -45,7 +63,9 @@ PMU, AON registers and wake timer about 13,400 um^2 (3.1 %).
 | Power during firmware matmul, OPP-H (mW) | | |
 | Leakage ACTIVE / IDLE / SLEEP (uW) | always on | |
 | SLEEP leakage vs baseline (% lower) | - | |
-| OPP-L timing at ss 1.40 V, 25 MHz (needs corner libs) | - | |
+| OPP-H setup slack, ss 100 C 1.60 V, 20 ns | - | |
+| OPP-L setup slack, ss 100 C 1.40 V, 40 ns | - | |
+| Hold slack, ff -40 C 1.95 V | - | |
 
 | ASAP7 accelerator, 700 ps | RVT | LVT | RVT + LVT |
 | --- | --- | --- | --- |

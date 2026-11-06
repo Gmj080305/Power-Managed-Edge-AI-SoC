@@ -44,9 +44,14 @@ Open `6_final.gds` in KLayout on Windows.
    `VCD_FILE` / `POWER_FILE_SCOPE`, so the final report uses real switching
    activity instead of default toggle rates. RTL register names match the
    netlist; `activity_annotation.rpt` shows how much was annotated.
-2. **Per domain.** `flow/scripts/power_by_domain.tcl` writes per-instance power;
-   `flow/scripts/summarize_power.py` sums it by domain (`u_cmp*` -> PD_CMP,
-   `u_mem*` -> PD_MEM, everything else -> PD_AON).
+2. **Per domain.** `flow/scripts/power_by_domain.tcl` writes per-instance power
+   for leaf cells; `flow/scripts/summarize_power.py` sums it by domain
+   (`u_cmp*` -> PD_CMP, `u_mem*` -> PD_MEM, everything else -> PD_AON). This
+   only works because the SoC configs keep the domain modules as hierarchy
+   (`SYNTH_KEEP_MODULES = *cmp_top* *mem_top* *aon_top*`): a fully flattened
+   ORFS netlist renames logic gates to `_NNN_`, leaving only flip-flops with a
+   domain prefix. The script stops with an error if PD_CMP ends up with under
+   20 % of the cells, the sign that names were lost.
 3. **Per state.** OpenSTA does not know a domain is off, so state leakage is
    built from the parts that stay powered:
 
@@ -66,9 +71,13 @@ the time: `summarize_power.py soc_lp.rpt --baseline soc_baseline.rpt`.
 ## Multi-corner STA
 
 `flow/sky130/soc.sdc` signs off OPP-H at the library ORFS ships (tt, 1.80 V).
-For the other corners run `flow/scripts/sta_corners.tcl` once per corner on the
-routed design, with libraries from an open_pdks / ciel `sky130A` install
-(`$PDK_ROOT/sky130A/libs.ref/sky130_fd_sc_hd/lib/`):
+The other corners need libraries from a `sky130A` PDK install. The `pnr`
+workflow does this for `soc_lp`: it installs the latest sky130 PDK with
+[ciel](https://github.com/fossi-foundation/ciel) (`pip install ciel`), then runs
+`flow/scripts/sta_corners.tcl` once per corner on the routed design and writes
+a slack table to the job summary (reports in the `sky130-soc_lp` artifact,
+`build/sta/`). By hand, the libraries are in
+`$PDK_ROOT/sky130A/libs.ref/sky130_fd_sc_hd/lib/`:
 
 | Check | Library | PERIOD |
 | --- | --- | --- |
@@ -96,7 +105,7 @@ level-shifter `LOWLVPWR` on `VDD_CMP`). Points that will likely need work:
 
 - OpenROAD's UPF support is partial; check the log for commands it ignored.
 - Domain membership depends on hierarchical names surviving synthesis
-  (`SYNTH_HIERARCHICAL=1`, `OPENROAD_HIERARCHICAL=1`).
+  (`SYNTH_KEEP_MODULES` for the three domain modules, `OPENROAD_HIERARCHICAL=1`).
 - `lpflow_lsbuf_lh_isowell_4` is a double-height cell: if detailed placement
   rejects it, pre-place the level shifters along the PD_CMP edge.
 - There is no power-switch cell in Sky130 HD, so each switched domain gets its

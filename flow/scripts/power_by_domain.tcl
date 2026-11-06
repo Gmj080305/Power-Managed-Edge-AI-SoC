@@ -18,5 +18,15 @@ if {[info exists ::env(VCD)] && [file exists $::env(VCD)]} {
   report_activity_annotation > $::env(OUT)/activity_annotation.rpt
 }
 report_power > $::env(OUT)/power_total.rpt
-report_power -instances [get_cells *] > $::env(OUT)/power_instances.rpt
+
+# Leaf cells only: with kept hierarchy (SYNTH_KEEP_MODULES) a hierarchical
+# instance row would double-count everything inside it.
+set leaves {}
+foreach c [get_cells -hierarchical *] {
+  if {[catch {get_property $c is_hierarchical} hier] || !$hier} {
+    lappend leaves $c
+  }
+}
+puts "power_by_domain: [llength $leaves] leaf instances"
+report_power -instances $leaves > $::env(OUT)/power_instances.rpt
 puts "power_by_domain: reports in $::env(OUT)"
